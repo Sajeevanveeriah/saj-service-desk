@@ -1,0 +1,2 @@
+export interface IdempotencyStore { get(key: string): Promise<unknown | undefined>; put(key: string, value: unknown): Promise<void>; }
+export async function idempotent<T>(store: IdempotencyStore, key: string, action: () => Promise<T>): Promise<T> { const prior = await store.get(key); if (prior !== undefined) return prior as T; const result = await action(); await store.put(key, result); return result; }
