@@ -29,7 +29,7 @@ jobs:
       - name: Build the read-only Pages export
         run: |
           mv src/app/api "$RUNNER_TEMP/server-api"
-          PAGES_EXPORT=true NEXT_PUBLIC_STATIC_DEMO=true npm run build
+          PAGES_EXPORT=true NEXT_PUBLIC_STATIC_DEMO=true NEXT_PUBLIC_SITE_BASE_PATH=/saj-service-desk npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
