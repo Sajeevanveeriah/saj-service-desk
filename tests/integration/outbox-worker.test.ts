@@ -31,5 +31,23 @@ describe.skipIf(!databaseUrl)("database outbox worker", () => {
     expect(row.rows[0]?.status).toBe("sent");
     expect(row.rows[0]?.attempts).toBe(0);
     expect(row.rows[0]?.sent_at).toBeInstanceOf(Date);
+    await pool.query("DELETE FROM outbox WHERE dedupe_key = $1", [dedupeKey]);
+    await expect(processDatabaseOutboxOnce()).resolves.toBe(0);
+  });
+
+  it("records delivery failures for unsupported messages", async () => {
+    const failureKey = `${dedupeKey}-failure`;
+    await pool.query(
+      "INSERT INTO outbox (dedupe_key, type, payload) VALUES ($1, 'unsupported', '{}'::jsonb)",
+      [failureKey],
+    );
+    await expect(processDatabaseOutboxOnce()).resolves.toBe(0);
+    const row = await pool.query<{ status: string; attempts: number; last_error: string }>(
+      "SELECT status, attempts, last_error FROM outbox WHERE dedupe_key = $1",
+      [failureKey],
+    );
+    expect(row.rows[0]).toMatchObject({ status: "pending", attempts: 1 });
+    expect(row.rows[0]?.last_error).toContain("Unsupported notification type");
+    await pool.query("DELETE FROM outbox WHERE dedupe_key = $1", [failureKey]);
   });
 });

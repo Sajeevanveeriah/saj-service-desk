@@ -44,6 +44,18 @@ describe.skipIf(!databaseUrl)("transactional quote and payment workflow", () => 
     expect(count.rows[0]?.count).toBe("1");
   });
 
+  it("rejects missing and cross-customer quote acceptance", async () => {
+    await expect(acceptQuoteToJob(pool, { quoteId: -1, customerId, acceptedBy: "customer", terms: "Terms" })).rejects.toThrow("not found");
+    const ownedQuote = await pool.query<{ id: number }>(
+      `INSERT INTO quotes (job_id, customer_id, version, reference, status, valid_until)
+       VALUES (NULL, $1, 1, $2, 'issued', '2030-01-01') RETURNING id`,
+      [customerId, `IT-Q-DENY-${Date.now()}`],
+    );
+    const deniedId = ownedQuote.rows[0]?.id ?? 0;
+    await expect(acceptQuoteToJob(pool, { quoteId: deniedId, customerId: customerId + 1, acceptedBy: "other", terms: "Terms" })).rejects.toThrow("own");
+    await pool.query("DELETE FROM quotes WHERE id = $1", [deniedId]);
+  });
+
   it("allocates unique document numbers concurrently", async () => {
     const type = `integration-${Date.now()}`;
     const numbers = await Promise.all(Array.from({ length: 8 }, () => allocateDocumentNumber(pool, type, "INV-TEST")));

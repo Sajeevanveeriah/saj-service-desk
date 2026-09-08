@@ -6,7 +6,7 @@ export function cents(value: number): Cents {
 }
 
 export function roundHalfUp(value: number): number {
-  return Math.floor(value + 0.5);
+  return value < 0 ? Math.ceil(value - 0.5) : Math.floor(value + 0.5);
 }
 
 export function percentageOf(amount: Cents, percentage: number): Cents {

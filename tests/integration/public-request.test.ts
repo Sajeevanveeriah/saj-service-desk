@@ -8,11 +8,13 @@ describe.skipIf(!databaseUrl)("public request route", () => {
   const email = "zoe.unicode+integration@example.test";
 
   beforeAll(async () => {
+    await pool.query("DELETE FROM request_rate_limits");
     await pool.query("DELETE FROM service_requests WHERE requestor_email = $1", [email]);
     await pool.query("DELETE FROM outbox WHERE payload->>'email' = $1", [email]);
   });
 
   afterAll(async () => {
+    await pool.query("DELETE FROM request_rate_limits");
     await pool.query("DELETE FROM outbox WHERE payload->>'email' = $1", [email]);
     await pool.query("DELETE FROM service_requests WHERE requestor_email = $1", [email]);
     await pool.end();
