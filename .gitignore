@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# Secrets and local overrides
+.env
+.env.*
+!.env.example
+
+# Private/runtime data
+runtime/
+uploads/
+backups/
+exports/
+*.dump
+*.sql.gz
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp

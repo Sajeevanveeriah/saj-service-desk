@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: saj_service_desk
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: saj_service_desk_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U saj_service_desk -d saj_service_desk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      NODE_ENV: test
+      APP_URL: http://127.0.0.1:3000
+      DATABASE_URL: postgresql://saj_service_desk:ci-only-password@127.0.0.1:5432/saj_service_desk_test
+      TEST_DATABASE_URL: postgresql://saj_service_desk:ci-only-password@127.0.0.1:5432/saj_service_desk_test
+      BETTER_AUTH_SECRET: ci-only-secret-with-at-least-thirty-two-characters
+      BETTER_AUTH_URL: https://ci.invalid
+      OWNER_BOOTSTRAP_TOKEN: ci-only-bootstrap-token
+      ATTACHMENT_STORAGE: local
+      LOCAL_ATTACHMENT_ROOT: runtime/attachments
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: 1025
+      SMTP_FROM: Saj Service Desk <no-reply@localhost>
+      LIVE_EMAIL_ENABLED: "false"
+      PAYPAL_MODE: link
+      PAYPAL_ENVIRONMENT: sandbox
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - run: npm ci
+      - run: npm run db:migrate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build

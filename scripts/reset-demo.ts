@@ -1,0 +1,10 @@
+import { sql } from "drizzle-orm";
+import { db, pool } from "../src/infrastructure/database/client";
+import { demoMarker } from "../src/infrastructure/database/schema";
+import { assertDemoDatabase } from "../src/domain/references";
+if (process.env.ALLOW_DEMO_RESET !== "true") throw new Error("Set ALLOW_DEMO_RESET=true to reset demo data; production databases are not eligible.");
+assertDemoDatabase(process.env.DATABASE_URL ?? "");
+await db.execute(sql`TRUNCATE TABLE service_requests, jobs, quotes, quote_lines, invoices, payments, attachments, outbox, audit_events, customers, users RESTART IDENTITY`);
+await db.delete(demoMarker);
+await pool.end();
+console.log("Demo records reset.");
