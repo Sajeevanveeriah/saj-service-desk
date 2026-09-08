@@ -325,6 +325,8 @@ Deployment, live sending, payment, repository creation and push are not performe
 
 ## GitHub Pages
 
-The Pages workflow publishes a read-only static export at `https://sajeevanveeriah.github.io/saj-service-desk/`. GitHub Pages cannot run the Next.js route handlers, Better Auth, PostgreSQL, private attachments, payment reconciliation or the outbox worker. The deployed request form therefore reports that the preview is read-only instead of pretending to save or send customer data.
+The Pages workflow publishes a static export at `https://sajeevanveeriah.github.io/saj-service-desk/`. GitHub Pages cannot run the Next.js route handlers, Better Auth, PostgreSQL, private attachments, payment reconciliation or the outbox worker.
+
+The dedicated public page is `https://sajeevanveeriah.github.io/saj-service-desk/request/`. It shows only the service request form. It uses no database or paid form service: the visitor prepares a structured email, reviews it and sends it from their own email app. Preparing the request does not send anything automatically. The page also provides a copyable public link and downloadable QR code.
 
 The complete server-capable source remains in this repository for deployment to a Node.js or Docker host. The Pages workflow temporarily excludes server routes only inside its isolated build runner, after the full source passes lint and type checking.
