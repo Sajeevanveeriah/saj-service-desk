@@ -16,12 +16,18 @@ if (isProduction && !appUrl.startsWith("https://") && !localProductionOverride) 
   throw new Error("Production requires an HTTPS BETTER_AUTH_URL.");
 }
 
+// Public self-registration is off unless PUBLIC_SIGN_UP_ENABLED is "true".
+// Disabling the HTTP route leaves the server-side auth.api.signUpEmail call
+// used by the one-time owner bootstrap working, and sign-in is unaffected.
+const publicSignUpEnabled = process.env.PUBLIC_SIGN_UP_ENABLED === "true";
+
 export const authOptions = {
   appName: "Saj Service Desk",
   baseURL: appUrl,
   secret,
   database: pool,
   trustedOrigins: [appUrl],
+  disabledPaths: publicSignUpEnabled ? [] : ["/sign-up/email"],
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 12,
