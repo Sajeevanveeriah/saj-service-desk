@@ -13,7 +13,7 @@ describe.skipIf(!databaseUrl)("owner bootstrap", () => {
   });
 
   afterAll(async () => {
-    await pool.query('DELETE FROM "user" WHERE email = $1', [email]);
+    await pool.query('DELETE FROM "user" WHERE email = ANY($1)', [[email, `public-${email}`]]);
     await pool.query("UPDATE bootstrap_state SET used_at = NULL, owner_user_id = NULL WHERE id = 1");
     await pool.end();
   });
@@ -36,5 +36,26 @@ describe.skipIf(!databaseUrl)("owner bootstrap", () => {
       body: JSON.stringify(body),
     }));
     expect(second.status).toBe(409);
+  });
+
+  it("refuses public self-registration but still lets the owner sign in", async () => {
+    const { POST } = await import("@/app/api/auth/[...all]/route");
+    const authBase = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+    const origin = new URL(authBase).origin;
+    const signUp = await POST(new Request(`${origin}/api/auth/sign-up/email`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ name: "Uninvited", email: `public-${email}`, password: "Correct-Horse-42-Battery" }),
+    }));
+    expect(signUp.status).toBe(404);
+    const created = await pool.query('SELECT 1 FROM "user" WHERE email = $1', [`public-${email}`]);
+    expect(created.rowCount).toBe(0);
+
+    const signIn = await POST(new Request(`${origin}/api/auth/sign-in/email`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ email, password: "Correct-Horse-42-Battery" }),
+    }));
+    expect(signIn.status).toBe(200);
   });
 });

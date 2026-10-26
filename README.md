@@ -314,6 +314,8 @@ Before deployment:
 - Set long random secrets in the deployment secret store.
 - Complete owner MFA and remove or rotate the bootstrap token.
 - Set the public application and authentication HTTPS URLs.
+- Leave `PUBLIC_SIGN_UP_ENABLED` unset or `false`. Public self-registration at `/api/auth/sign-up/email` is off by default; the owner account comes from the one-time bootstrap, and existing accounts sign in as before.
+- Set `TRUSTED_CLIENT_IP_HEADER` to the client-IP header your host's proxy sets (`cf-connecting-ip` on Cloudflare, `x-vercel-forwarded-for` on Vercel, or `x-real-ip` from your own reverse proxy). Without it, public requests share one limit of 30 per 15 minutes; a caller-supplied `X-Forwarded-For` is never trusted on its own.
 - Confirm GST status and document settings with their effective dates.
 - Configure a live email provider, then complete a deliberate delivery test.
 - Configure PayPal sandbox and complete real order, capture, webhook, cancellation, refund and reversal tests before considering live mode.
