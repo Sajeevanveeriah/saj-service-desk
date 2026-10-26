@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { pool } from "@/infrastructure/database/client";
 import { POST } from "@/app/api/requests/route";
 
@@ -13,7 +13,13 @@ describe.skipIf(!databaseUrl)("public request route", () => {
     await pool.query("DELETE FROM outbox WHERE payload->>'email' = $1", [email]);
   });
 
+  beforeEach(async () => {
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-real-ip");
+    await pool.query("DELETE FROM request_rate_limits");
+  });
+
   afterAll(async () => {
+    vi.unstubAllEnvs();
     await pool.query("DELETE FROM request_rate_limits");
     await pool.query("DELETE FROM outbox WHERE payload->>'email' = $1", [email]);
     await pool.query("DELETE FROM service_requests WHERE requestor_email = $1", [email]);
@@ -23,7 +29,7 @@ describe.skipIf(!databaseUrl)("public request route", () => {
   it("persists a valid Unicode request and queues one acknowledgement", async () => {
     const response = await POST(new Request("http://localhost:3000/api/requests", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "192.0.2.44" },
+      headers: { "content-type": "application/json", "x-real-ip": "192.0.2.44" },
       body: JSON.stringify({
         category: "Robotics, electronics and prototyping",
         description: "Diagnose the café robot sensor fault and preserve the existing controller profile.",
@@ -54,7 +60,7 @@ describe.skipIf(!databaseUrl)("public request route", () => {
   it("returns a useful validation error without writing a record", async () => {
     const response = await POST(new Request("http://localhost:3000/api/requests", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "192.0.2.45" },
+      headers: { "content-type": "application/json", "x-real-ip": "192.0.2.45" },
       body: JSON.stringify({ category: "", description: "short" }),
     }));
 
@@ -76,7 +82,7 @@ describe.skipIf(!databaseUrl)("public request route", () => {
 
     const response = await POST(new Request("http://localhost:3000/api/requests", {
       method: "POST",
-      headers: { "x-forwarded-for": "192.0.2.46" },
+      headers: { "x-real-ip": "192.0.2.46" },
       body: form,
     }));
 
@@ -96,12 +102,35 @@ describe.skipIf(!databaseUrl)("public request route", () => {
     for (let index = 0; index < 6; index += 1) {
       responses.push(await POST(new Request("http://localhost:3000/api/requests", {
         method: "POST",
-        headers: { "content-type": "application/json", "x-forwarded-for": "192.0.2.100" },
+        headers: { "content-type": "application/json", "x-real-ip": "192.0.2.100" },
         body,
       })));
     }
     expect(responses.slice(0, 5).every((response) => response.status === 201)).toBe(true);
     expect(responses[5]?.status).toBe(429);
     expect(responses[5]?.headers.get("retry-after")).toBe("900");
+  });
+
+  it("ignores a caller-chosen X-Forwarded-For and falls back to one shared limit", async () => {
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "");
+    const body = JSON.stringify({
+      category: "Computers and networks",
+      description: "Spoofed forwarding header used to verify the shared fallback limit.",
+      preference: "remote",
+      urgency: "normal",
+      name: "Spoof Test",
+      email,
+    });
+    const statuses: number[] = [];
+    for (let index = 0; index < 31; index += 1) {
+      const response = await POST(new Request("http://localhost:3000/api/requests", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": `198.51.100.${index}` },
+        body,
+      }));
+      statuses.push(response.status);
+    }
+    expect(statuses.slice(0, 30).every((status) => status === 201)).toBe(true);
+    expect(statuses[30]).toBe(429);
   });
 });

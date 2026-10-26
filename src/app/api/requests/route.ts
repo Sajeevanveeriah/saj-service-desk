@@ -7,12 +7,32 @@ import { validateUpload } from "@/infrastructure/storage/validation";
 
 const RATE_WINDOW_MINUTES = 15;
 const RATE_LIMIT = 5;
+// Shared ceiling used when the host has not named a trusted client-IP header.
+const GLOBAL_RATE_LIMIT = 30;
 
-const clientKey = (request: Request): string => {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const source = forwarded || request.headers.get("x-real-ip") || "local-unknown";
+// Only the header the hosting platform's own proxy sets can identify a client:
+// for example cf-connecting-ip (Cloudflare), x-vercel-forwarded-for (Vercel) or
+// x-real-ip set by a reverse proxy you run. The raw first X-Forwarded-For value
+// is chosen by the caller, so it is never used on its own.
+const trustedClientAddress = (request: Request): string | null => {
+  const header = process.env.TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase();
+  if (!header) return null;
+  const value = request.headers.get(header);
+  if (!value) return null;
+  // A proxy appends to X-Forwarded-For, so only its last entry is trustworthy.
+  const entries = value.split(",").map((entry) => entry.trim()).filter(Boolean);
+  const address = header === "x-forwarded-for" ? entries.at(-1) : entries[0];
+  return address && /^[0-9A-Fa-f:.]{2,64}$/.test(address) ? address : null;
+};
+
+const clientLimit = (request: Request): { key: string; limit: number } => {
+  const address = trustedClientAddress(request);
+  const source = address ? `client:${address}` : "global";
   const salt = process.env.BETTER_AUTH_SECRET ?? "development-rate-limit-salt";
-  return createHash("sha256").update(`${salt}:${source}`).digest("hex");
+  return {
+    key: createHash("sha256").update(`${salt}:${source}`).digest("hex"),
+    limit: address ? RATE_LIMIT : GLOBAL_RATE_LIMIT,
+  };
 };
 
 const requestReference = (): string => {
@@ -38,7 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   let storedKey: string | null = null;
   try {
     await database.query("BEGIN");
-    const key = clientKey(request);
+    const { key, limit } = clientLimit(request);
     await database.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [key]);
     await database.query(
       "DELETE FROM request_rate_limits WHERE occurred_at < now() - ($1 * interval '1 minute')",
@@ -49,7 +69,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       [key],
     );
 
-    if (Number(count.rows[0]?.count ?? "0") >= RATE_LIMIT) {
+    if (Number(count.rows[0]?.count ?? "0") >= limit) {
       await database.query("ROLLBACK");
       return NextResponse.json(
         { error: "Too many requests. Wait 15 minutes before trying again." },
