@@ -332,3 +332,7 @@ The Pages workflow publishes a static export at `https://sajeevanveeriah.github.
 The dedicated public page is `https://sajeevanveeriah.github.io/saj-service-desk/request/`. It shows only the service request form. It uses no database or paid form service: the visitor prepares a structured email, reviews it and sends it from their own email app. Preparing the request does not send anything automatically. The page also provides a copyable public link and downloadable QR code.
 
 The complete server-capable source remains in this repository for deployment to a Node.js or Docker host. The Pages workflow temporarily excludes server routes only inside its isolated build runner, after the full source passes lint and type checking.
+
+## Project handoff
+
+Read the [project handoff](HANDOFF.md) for current work, checks and the next step.
